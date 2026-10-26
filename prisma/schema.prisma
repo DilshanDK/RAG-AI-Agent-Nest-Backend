@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  documents    Document[]
+  chatMessages ChatMessage[]
+  chatSessions ChatSession[]
+}
+
+model Document {
+  id         String          @id @default(uuid())
+  title      String
+  filename   String
+  filePath   String
+  fileSize   Int
+  uploadDate DateTime        @default(now())
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks     DocumentChunk[]
+}
+
+model DocumentChunk {
+  id         String                     @id @default(uuid())
+  documentId String
+  document   Document                   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String
+  // pgvector column representation. Dimension is 768 for Gemini's text-embedding-004.
+  embedding  Unsupported("vector(768)")
+  chunkIndex Int
+}
+
+model ChatSession {
+  id         String        @id @default(uuid())
+  title      String        @default("New Chat")
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId String?       // Optional document ID if conversation is scoped to a specific file
+  provider   String?       // AI provider chosen for this chat (e.g. 'groq', 'gemini', 'openrouter')
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  messages   ChatMessage[]
+}
+
+model ChatMessage {
+  id        String       @id @default(uuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String?
+  session   ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String       // "user" or "assistant"
+  message   String
+  sources   Json?        // Array/Object detailing chunk sources referenced
+  timestamp DateTime     @default(now())
+}
